@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # --- System-Wide Configuration ---
@@ -23,9 +22,9 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # --- Dependencies ---
-echo "--> Checking for dependencies (curl, wget, grep)..."
+echo "--> Checking for dependencies (curl, wget, grep, binwalk, squashfs-tools)..."
 apt-get update > /dev/null
-apt-get install -y curl wget libfuse2 > /dev/null
+apt-get install -y curl wget libfuse2 binwalk squashfs-tools > /dev/null
 echo "--> Dependencies are satisfied."
 
 # --- Installation ---
@@ -55,11 +54,19 @@ if [ -d "$FINAL_APP_PATH" ]; then
 fi
 
 echo "--> Extracting the AppImage to $FINAL_APP_PATH..."
-(cd "$TEMP_DOWNLOAD_DIR" && ./Cursor.AppImage --appimage-extract)
-mv "$TEMP_DOWNLOAD_DIR/squashfs-root" "$FINAL_APP_PATH"
+mkdir -p "$FINAL_APP_PATH"
+(cd "$TEMP_DOWNLOAD_DIR" && binwalk -e --run-as=root "$TEMP_DOWNLOAD_DIR/Cursor.AppImage" > /dev/null)
+
+SQUASHFS_ROOT=$(find "$TEMP_DOWNLOAD_DIR" -type d -name 'squashfs-root' -print -quit)
+
+if [ -z "$SQUASHFS_ROOT" ]; then
+    echo "Error: Failed to extract AppImage. The squashfs-root directory was not created."
+    exit 1
+fi
+
+mv "$SQUASHFS_ROOT"/* "$FINAL_APP_PATH/"
 
 echo "--> Patching product.json for MS Marketplace and Copilot..."
-# ** CORRECTED PATH based on your feedback **
 PRODUCT_JSON_PATH="$FINAL_APP_PATH/usr/share/cursor/resources/app/product.json"
 
 if [ ! -f "$PRODUCT_JSON_PATH" ]; then
